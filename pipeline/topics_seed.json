@@ -1,0 +1,14 @@
+[
+  {"title": "Pourquoi le ciel devient rouge au coucher du soleil ?", "category": "science", "mode": "info", "reading_time": "30s"},
+  {"title": "Comment une fourmilière prend des décisions sans chef", "category": "nature", "mode": "info", "reading_time": "2min"},
+  {"title": "Ce que le télescope James Webb a vraiment changé", "category": "espace", "mode": "info", "reading_time": "2min"},
+  {"title": "Pourquoi on oublie ses rêves en quelques minutes", "category": "psychologie", "mode": "info", "reading_time": "30s"},
+  {"title": "L'histoire secrète du mot 'salaire' et du sel romain", "category": "histoire", "mode": "info", "reading_time": "2min"},
+  {"title": "Comment fonctionne vraiment une mémoire flash", "category": "tech", "mode": "info", "reading_time": "2min"},
+  {"title": "Pourquoi certaines économies préfèrent une inflation faible mais non nulle", "category": "economie", "mode": "info", "reading_time": "5min"},
+  {"title": "Le détroit d'Ormuz : pourquoi ce goulot fait trembler les marchés", "category": "geopolitique", "mode": "info", "reading_time": "5min"},
+
+  {"title": "Rome, épisode 1 : la fondation, mythe et archéologie", "category": "histoire", "mode": "info", "reading_time": "2min", "series": "Les Romains", "series_index": 1, "series_total": 12},
+  {"title": "Rome, épisode 2 : comment la République a inventé le contre-pouvoir", "category": "histoire", "mode": "info", "reading_time": "2min", "series": "Les Romains", "series_index": 2, "series_total": 12},
+  {"title": "Rome, épisode 3 : les routes qui ont tenu un empire", "category": "histoire", "mode": "info", "reading_time": "2min", "series": "Les Romains", "series_index": 3, "series_total": 12}
+]

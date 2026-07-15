@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.last_batch
+.pending_topics.json
+.env
