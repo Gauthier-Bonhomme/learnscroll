@@ -15,7 +15,11 @@ par le modèle, Flutter était un poids mort (SDK absent, stores payants).
 
 ## Emplacement & environnement
 
-- Projet : `C:\Users\Gauthier\Desktop\learnscroll\` — dépôt git initialisé (16/07/2026), pas de remote.
+- Projet : `C:\Users\Gauthier\Desktop\learnscroll\` — dépôt git, remote
+  `https://github.com/Gauthier-Bonhomme/learnscroll` (public, requis pour Pages gratuit).
+- **Site en ligne : https://gauthierbonhomme.com/learnscroll/** (Pages en mode
+  workflow ; le domaine du site CV s'applique aux project pages). Déployé le
+  16/07/2026, vérifié 200 + index.json servi. Push sur `site/**` = redéploiement auto.
 - Machine : Windows 11 ; Python 3.14 (lancer avec `-X utf8` pour les emojis console).
 - Deps pip : anthropic, pydantic (rien d'autre ; SQLAlchemy/FastAPI plus utilisés).
 - Preview : entrée `learnscroll-site` dans `mon-cv\images\.claude\launch.json`
@@ -80,5 +84,4 @@ vrai appareil.
 2. Pas d'images (glyphes emoji sur dégradés) — un générateur/banque d'images
    cohérente reste le gros chantier visuel.
 3. Dwell tracking IntersectionObserver à valider sur mobile réel.
-4. Pas de remote GitHub → créer le repo + activer Pages pour déployer.
-5. Lancer un premier vrai batch (topics_seed.json, ~11 sujets ≈ 0,09 $).
+4. Lancer un premier vrai batch (topics_seed.json, ~11 sujets ≈ 0,09 $).
