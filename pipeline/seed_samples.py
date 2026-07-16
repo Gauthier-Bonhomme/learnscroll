@@ -1,13 +1,14 @@
 """
-Insère quelques cartes de démonstration écrites à la main (aucun appel API).
-Sert à voir tourner le backend et le feed avant d'avoir lancé un vrai batch.
+Insère quelques cartes de démonstration écrites à la main (aucun appel API)
+dans le catalogue. Sert à voir tourner le site avant d'avoir lancé un vrai batch.
 
     python seed_samples.py
+    python export_site.py
 """
 
 from __future__ import annotations
 
-from app.db import Card, SessionLocal, Series, init_db
+import catalog
 
 SAMPLES = [
     dict(
@@ -19,17 +20,22 @@ SAMPLES = [
              "dispersé dans tous les sens et se perd. Ne survivent que les rouges et les "
              "oranges, assez robustes pour aller au bout du trajet. Ce coucher de soleil "
              "flamboyant, c'est littéralement la lumière fatiguée du voyage.",
-        why=[{"question": "Pourquoi le bleu se disperse-t-il plus que le rouge ?",
-              "answer": "Parce qu'il a une longueur d'onde plus courte : il ricoche sur les "
-                        "molécules d'air bien plus facilement, comme une petite vague brisée "
-                        "par le moindre obstacle."},
-             {"question": "Pourquoi ça traverse plus d'air le soir ?",
-              "answer": "Le Soleil est bas sur l'horizon : ses rayons entrent en biais et "
-                        "parcourent une tranche d'atmosphère beaucoup plus épaisse qu'à la "
-                        "verticale de midi."}],
+        why_layers=[
+            {"question": "Pourquoi le bleu se disperse-t-il plus que le rouge ?",
+             "answer": "Parce qu'il a une longueur d'onde plus courte : il ricoche sur les "
+                       "molécules d'air bien plus facilement, comme une petite vague brisée "
+                       "par le moindre obstacle."},
+            {"question": "Pourquoi ça traverse plus d'air le soir ?",
+             "answer": "Le Soleil est bas sur l'horizon : ses rayons entrent en biais et "
+                       "parcourent une tranche d'atmosphère beaucoup plus épaisse qu'à la "
+                       "verticale de midi."},
+            {"question": "Pourquoi l'atmosphère ne disperse-t-elle pas toutes les couleurs pareil ?",
+             "answer": "La diffusion de Rayleigh dépend violemment de la longueur d'onde : "
+                       "diviser la longueur d'onde par deux multiplie la diffusion par seize. "
+                       "Le ciel entier est une démonstration de physique en temps réel."},
+        ],
         sources=[{"title": "NASA Science", "url": "https://science.nasa.gov"}],
         tags=["lumière", "atmosphère", "optique"],
-        image_prompt="editorial wide photo of a deep red sunset over the sea, natural light",
     ),
     dict(
         external_id="demo-fourmis", category="nature", mode="info", reading_time="2min",
@@ -41,12 +47,17 @@ SAMPLES = [
              "la colonie trouve le chemin le plus court sans qu'aucune fourmi ne l'ait "
              "calculé. C'est l'intelligence en essaim — la même idée qui inspire aujourd'hui "
              "des algorithmes de routage et de logistique.",
-        why=[{"question": "Pourquoi le chemin le plus court finit par gagner ?",
-              "answer": "Il est parcouru plus vite, donc plus souvent : sa piste odorante est "
-                        "rechargée en permanence pendant que les détours s'évaporent."}],
+        why_layers=[
+            {"question": "Pourquoi le chemin le plus court finit par gagner ?",
+             "answer": "Il est parcouru plus vite, donc plus souvent : sa piste odorante est "
+                       "rechargée en permanence pendant que les détours s'évaporent."},
+            {"question": "Pourquoi personne n'a besoin de voir la carte en entier ?",
+             "answer": "Chaque fourmi ne lit que l'information locale — l'odeur sous ses "
+                       "pattes. La 'carte' n'existe nulle part : elle émerge de millions de "
+                       "micro-décisions qui se corrigent mutuellement."},
+        ],
         sources=[{"title": "CNRS Le Journal", "url": "https://lejournal.cnrs.fr"}],
         tags=["fourmis", "intelligence collective", "biologie"],
-        image_prompt="macro editorial photo of ants on a trail, shallow depth of field",
     ),
     dict(
         external_id="demo-reves", category="psychologie", mode="info", reading_time="30s",
@@ -57,12 +68,17 @@ SAMPLES = [
              "souvenirs durables tournent au ralenti. Le rêve est vécu mais mal 'enregistré'. "
              "Si vous ne le rejouez pas mentalement dans les premières secondes, il glisse. "
              "D'où l'astuce des carnets de rêves posés sur la table de nuit.",
-        why=[{"question": "Pourquoi la mémoire tourne-t-elle au ralenti la nuit ?",
-              "answer": "Le cerveau consacre le sommeil à trier et consolider la journée "
-                        "écoulée, pas à mémoriser de nouveaux scénarios en direct."}],
+        why_layers=[
+            {"question": "Pourquoi la mémoire tourne-t-elle au ralenti la nuit ?",
+             "answer": "Le cerveau consacre le sommeil à trier et consolider la journée "
+                       "écoulée, pas à mémoriser de nouveaux scénarios en direct."},
+            {"question": "Pourquoi certains rêves restent-ils quand même ?",
+             "answer": "Ceux du petit matin, faits juste avant le réveil, bénéficient d'un "
+                       "cerveau déjà en train de redémarrer : la machine à souvenirs se "
+                       "rallume pendant que le film tourne encore."},
+        ],
         sources=[{"title": "Inserm", "url": "https://www.inserm.fr"}],
         tags=["rêves", "mémoire", "sommeil"],
-        image_prompt="dreamy editorial photo of a blurred bedroom at dawn, soft light",
     ),
     dict(
         external_id="demo-rome-1", category="histoire", mode="info", reading_time="2min",
@@ -74,12 +90,17 @@ SAMPLES = [
              "regroupées sur des collines, un carrefour commercial bien placé sur le Tibre, "
              "et des siècles de fusion entre peuples. Rome n'est pas née d'un coup de génie "
              "— elle a poussé, village après village.",
-        why=[{"question": "Pourquoi ce site précis sur le Tibre ?",
-              "answer": "Un gué franchissable, sept collines défendables et une route du sel "
-                        "qui passait juste là : la géographie a fait le reste."}],
+        why_layers=[
+            {"question": "Pourquoi ce site précis sur le Tibre ?",
+             "answer": "Un gué franchissable, sept collines défendables et une route du sel "
+                       "qui passait juste là : la géographie a fait le reste."},
+            {"question": "Pourquoi le mythe de la louve a-t-il tenu deux mille ans ?",
+             "answer": "Parce que Rome en avait besoin : une origine divine et sauvage "
+                       "justifiait sa domination. Les empires écrivent toujours leur légende "
+                       "après coup — et la nôtre continue de les croire."},
+        ],
         sources=[{"title": "British Museum", "url": "https://www.britishmuseum.org"}],
         tags=["Rome", "antiquité", "archéologie"],
-        image_prompt="editorial photo of the Roman Palatine hill ruins at golden hour",
         series="Les Romains", series_index=1,
     ),
     dict(
@@ -92,45 +113,28 @@ SAMPLES = [
              "moindre tension — une menace de blocage, un incident naval — et les marchés "
              "s'affolent, car il n'existe aucun contournement rapide. Un point minuscule sur "
              "la carte, un levier géant sur les prix.",
-        why=[{"question": "Pourquoi ne pas simplement contourner le détroit ?",
-              "answer": "Quelques oléoducs existent, mais leur capacité est très inférieure "
-                        "au trafic maritime : ils ne peuvent absorber qu'une fraction du flux."}],
+        why_layers=[
+            {"question": "Pourquoi ne pas simplement contourner le détroit ?",
+             "answer": "Quelques oléoducs existent, mais leur capacité est très inférieure "
+                       "au trafic maritime : ils ne peuvent absorber qu'une fraction du flux."},
+            {"question": "Pourquoi personne ne construit plus d'oléoducs, alors ?",
+             "answer": "Un oléoduc traverse des frontières, des déserts et des décennies de "
+                       "géopolitique. Le bateau, lui, ne demande la permission à personne — "
+                       "tant que le détroit reste ouvert."},
+        ],
         sources=[{"title": "Reuters", "url": "https://www.reuters.com"}],
         tags=["pétrole", "Ormuz", "commerce", "énergie"],
-        image_prompt="editorial aerial photo of oil tankers in a narrow strait, dusk",
     ),
 ]
 
 
 def run() -> None:
-    init_db()
-    s = SessionLocal()
-    added = 0
-    for item in SAMPLES:
-        if s.query(Card).filter_by(external_id=item["external_id"]).first():
-            continue
-        series = None
-        if item.get("series"):
-            series = s.query(Series).filter_by(name=item["series"]).one_or_none()
-            if not series:
-                series = Series(name=item["series"], category=item["category"])
-                s.add(series)
-                s.flush()
-        card = Card(
-            external_id=item["external_id"], hook=item["hook"], category=item["category"],
-            mode=item["mode"], reading_time=item["reading_time"], teaser=item["teaser"],
-            body=item["body"], image_prompt=item["image_prompt"], model_used="demo-seed",
-            series=series, series_index=item.get("series_index"),
-        )
-        card.why_layers = item["why"]
-        card.sources = item["sources"]
-        card.tags = item["tags"]
-        s.add(card)
-        added += 1
-    s.commit()
-    total = s.query(Card).count()
-    s.close()
-    print(f"✔ {added} cartes de démo ajoutées. Total en base : {total}.")
+    conn = catalog.connect()
+    added = sum(1 for item in SAMPLES if catalog.upsert_card(conn, item))
+    conn.commit()
+    total = conn.execute("SELECT COUNT(*) FROM cards").fetchone()[0]
+    conn.close()
+    print(f"✔ {added} cartes de démo ajoutées. Total au catalogue : {total}.")
 
 
 if __name__ == "__main__":

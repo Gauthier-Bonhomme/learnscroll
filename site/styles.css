@@ -1,0 +1,139 @@
+/* LearnScroll — DA éditoriale : Fraunces + Inter, fond noir chaud, accent ambre. */
+:root{
+  --ink:#f7f3ec; --mut:#c9c1b3; --line:rgba(255,255,255,.16); --acc:#e0a367;
+  --bg:#0c0b0a; --panel:#17150f;
+  /* Une teinte par catégorie (les noms correspondent EXACTEMENT aux slugs). */
+  --science:#3b6ea5; --nature:#4a7c59; --histoire:#9a6a3c; --psychologie:#7d5ba6;
+  --geopolitique:#a8503f; --economie:#3f7d78; --espace:#2d3561; --tech:#4a5568;
+  --culture:#a04f7d; --sante:#6f8f4f; --defaut:#5a4a3a;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+  font-family:Inter,system-ui,sans-serif; overscroll-behavior:none;}
+button{font-family:inherit;}
+
+/* ---------- Topbar ---------- */
+#topbar{position:fixed;top:0;left:0;right:0;z-index:30;display:flex;align-items:center;
+  justify-content:space-between;padding:12px 16px;
+  background:linear-gradient(#0c0b0add,transparent);}
+.brand{font-family:Fraunces,Georgia,serif;font-weight:800;font-size:20px;letter-spacing:.01em;}
+.brand em{color:var(--acc);font-style:italic;}
+.topActions{display:flex;gap:8px;}
+.tchip{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--mut);
+  background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:999px;
+  padding:7px 12px;cursor:pointer;backdrop-filter:blur(6px);}
+.tchip b{color:var(--acc);}
+
+/* ---------- Feed ---------- */
+#feed{height:100dvh;overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;}
+#feed::-webkit-scrollbar{display:none;}
+.card{height:100dvh;scroll-snap-align:start;position:relative;display:flex;flex-direction:column;
+  justify-content:flex-end;padding:0 22px 42px;overflow:hidden;}
+.art{position:absolute;inset:0;z-index:0;}
+.art::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(0,0,0,.35)0%,rgba(0,0,0,.15)38%,rgba(0,0,0,.72)78%,#0c0b0a 100%);}
+.art .glyph{position:absolute;top:24%;left:50%;transform:translateX(-50%);
+  font-size:120px;opacity:.16;filter:grayscale(.2);}
+.content{position:relative;z-index:2;max-width:640px;margin:0 auto;width:100%;}
+.chips{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.chip{font-size:12px;padding:4px 11px;border:1px solid var(--line);border-radius:999px;
+  background:rgba(0,0,0,.25);backdrop-filter:blur(6px);color:var(--ink);text-transform:capitalize;}
+.chip.time{color:var(--acc);border-color:rgba(224,163,103,.5);}
+.hook{font-family:Fraunces,Georgia,serif;font-weight:800;font-size:clamp(27px,6.4vw,40px);
+  line-height:1.08;margin:0 0 12px;text-wrap:balance;text-shadow:0 2px 18px rgba(0,0,0,.5);}
+.teaser{font-size:16px;line-height:1.5;color:var(--mut);margin:0 0 22px;max-width:560px;}
+.rail{display:flex;align-items:center;gap:10px;}
+.rail .discover{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:14px;border-radius:14px;background:var(--acc);color:#221507;font-weight:600;
+  border:none;font-size:15px;cursor:pointer;}
+.rail .act{width:52px;height:52px;border-radius:14px;border:1px solid var(--line);
+  background:rgba(0,0,0,.3);backdrop-filter:blur(6px);color:var(--ink);font-size:20px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:transform .12s;}
+.rail .act:active{transform:scale(.9);}
+.rail .act.on{background:var(--acc);border-color:var(--acc);color:#221507;}
+.hint-swipe{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:2;
+  font-size:12px;color:var(--mut);opacity:.6;animation:bob 1.8s ease-in-out infinite;}
+@keyframes bob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,5px)}}
+
+/* Carte « tout vu » */
+.card.allseen .content{text-align:center;margin-bottom:18vh;}
+.card.allseen .hook{font-size:clamp(24px,5.5vw,34px);}
+.resetbtn{margin-top:14px;background:none;border:1px solid var(--acc);color:var(--acc);
+  padding:12px 20px;border-radius:12px;font-size:15px;cursor:pointer;}
+
+/* ---------- Détail ---------- */
+#detail{position:fixed;inset:0;z-index:50;background:var(--bg);transform:translateY(100%);
+  transition:transform .32s cubic-bezier(.2,.8,.2,1);overflow-y:auto;visibility:hidden;}
+#detail.open{transform:translateY(0);visibility:visible;}
+#detail .dwrap{max-width:680px;margin:0 auto;padding:14px 22px 90px;}
+#detail .back{position:sticky;top:0;z-index:2;background:linear-gradient(var(--bg) 60%,transparent);
+  padding:8px 0 16px;margin:-4px 0 6px;}
+#detail .back button{background:rgba(0,0,0,.4);border:1px solid var(--line);color:var(--ink);
+  padding:8px 14px;border-radius:10px;cursor:pointer;font-size:14px;}
+#detail h1{font-family:Fraunces,Georgia,serif;font-weight:800;font-size:30px;line-height:1.1;margin:6px 0 8px;}
+#detail .meta{color:var(--mut);font-size:13px;margin-bottom:20px;}
+#detail .body{font-size:17px;line-height:1.66;color:#ece6db;}
+#detail .body p{margin:0 0 16px;}
+#detail .body h3{font-family:Fraunces,Georgia,serif;font-size:20px;margin:22px 0 8px;}
+
+/* Arbre « pourquoi » — révélation progressive */
+.whybtn{margin:26px 0 8px;width:100%;padding:15px;border-radius:14px;border:1px dashed var(--acc);
+  background:rgba(224,163,103,.08);color:var(--acc);font-weight:600;font-size:15px;cursor:pointer;}
+.layer{border-left:2px solid var(--acc);padding:2px 0 2px 16px;margin:16px 0;
+  animation:reveal .35s ease;}
+@keyframes reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.layer .q{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:18px;margin-bottom:6px;}
+.layer .a{color:#ded7ca;line-height:1.55;}
+
+/* Cartes liées */
+.related{margin-top:30px;}
+.related h3, .sources h3{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);}
+.relgrid{display:grid;gap:10px;}
+.relcard{display:flex;align-items:center;gap:12px;text-align:left;width:100%;
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:13px 15px;color:var(--ink);cursor:pointer;font-size:15px;line-height:1.35;}
+.relcard .dot{width:10px;height:10px;border-radius:50%;flex:none;}
+.relcard small{display:block;color:var(--mut);font-size:12px;margin-top:3px;text-transform:capitalize;}
+
+.sources{margin-top:30px;border-top:1px solid var(--line);padding-top:16px;}
+.sources a{color:var(--acc);text-decoration:none;display:block;margin:6px 0;font-size:14px;
+  overflow-wrap:anywhere;}
+
+/* ---------- Panneau (favoris / profil) ---------- */
+#sheet{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.55);opacity:0;visibility:hidden;
+  transition:opacity .25s;}
+#sheet.open{opacity:1;visibility:visible;}
+.swrap{position:absolute;left:0;right:0;bottom:0;max-height:82dvh;overflow-y:auto;
+  background:var(--panel);border-radius:22px 22px 0 0;border-top:1px solid var(--line);
+  padding:18px 20px 40px;max-width:680px;margin:0 auto;
+  transform:translateY(30px);transition:transform .25s;}
+#sheet.open .swrap{transform:none;}
+.shead{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.shead h2{font-family:Fraunces,Georgia,serif;font-size:21px;margin:0;}
+.shead button{background:none;border:1px solid var(--line);color:var(--mut);width:34px;height:34px;
+  border-radius:10px;cursor:pointer;font-size:14px;}
+.statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:14px 0;}
+.stat{background:rgba(0,0,0,.25);border:1px solid var(--line);border-radius:14px;padding:13px 15px;}
+.stat b{display:block;font-size:24px;font-family:Fraunces,Georgia,serif;}
+.stat span{color:var(--mut);font-size:12.5px;}
+.lvlbar{height:7px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden;margin:8px 0 4px;}
+.lvlbar i{display:block;height:100%;background:var(--acc);border-radius:99px;}
+.serieRow{margin:12px 0;}
+.serieRow .n{display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px;}
+.serieRow .n span{color:var(--mut);}
+.favRow{display:flex;align-items:center;gap:11px;background:rgba(0,0,0,.25);
+  border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:9px 0;cursor:pointer;}
+.favRow .dot{width:10px;height:10px;border-radius:50%;flex:none;}
+.favRow .t{flex:1;font-size:15px;line-height:1.35;}
+.favRow .t small{display:block;color:var(--mut);font-size:12px;text-transform:capitalize;margin-top:2px;}
+.favRow .rm{background:none;border:none;color:var(--mut);font-size:16px;cursor:pointer;padding:6px;}
+.sheetEmpty{color:var(--mut);text-align:center;padding:26px 10px;font-size:15px;}
+
+/* ---------- Divers ---------- */
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:#1c1913;border:1px solid var(--line);padding:11px 18px;border-radius:12px;z-index:80;
+  opacity:0;transition:.25s;font-size:14px;pointer-events:none;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.empty{height:100dvh;display:flex;flex-direction:column;gap:10px;align-items:center;
+  justify-content:center;text-align:center;padding:30px;color:var(--mut);}
+.empty code{background:#1c1913;padding:2px 8px;border-radius:6px;}

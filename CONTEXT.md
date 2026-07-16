@@ -1,71 +1,84 @@
-# LearnScroll — État du projet (15/07/2026)
+# LearnScroll — État du projet (16/07/2026, refonte v2)
 
-App mobile « TikTok de l'apprentissage » : remplacer le doomscrolling par du
-learnscrolling. Feed vertical de cartes de connaissance, chaque swipe apprend
-quelque chose en <60 s. **Contrainte produit centrale : app gratuite → l'IA
-n'est JAMAIS appelée au runtime du feed ; tout le contenu est généré en amont
-par batch et stocké en base.**
+App « TikTok de l'apprentissage » : remplacer le doomscrolling par du
+learnscrolling. **Contrainte produit centrale : app gratuite pour toujours →
+architecture 100 % statique, 0 € d'hébergement, aucun appel IA au runtime.**
+
+## Refonte v2 (16/07/2026) — décisions actées
+
+La v1 (FastAPI + SQLAlchemy + webapp servie + app Flutter jamais compilée) a
+été **remplacée** par un site statique. Motifs : le endpoint `/why` ouvert
+était une bombe à coûts (LLM sans auth ni quota), un serveur 24/7 coûte
+5-20 €/mois pour du contenu 100 % pré-généré, les sources étaient fabriquées
+par le modèle, Flutter était un poids mort (SDK absent, stores payants).
+**Tout l'ancien code reste dans git** (commit initial `78f249b`).
 
 ## Emplacement & environnement
 
-- Projet : `C:\Users\Gauthier\Desktop\learnscroll\` — **pas de dépôt git initialisé**.
-- Machine : Windows 11 ; Python 3.14 et Node 24 installés ; **Flutter ABSENT**.
-- Deps pip installées globalement : anthropic, pydantic, sqlalchemy, fastapi, uvicorn.
-- Un serveur uvicorn a pu rester actif sur le port 8077 (lancé en arrière-plan).
+- Projet : `C:\Users\Gauthier\Desktop\learnscroll\` — dépôt git initialisé (16/07/2026), pas de remote.
+- Machine : Windows 11 ; Python 3.14 (lancer avec `-X utf8` pour les emojis console).
+- Deps pip : anthropic, pydantic (rien d'autre ; SQLAlchemy/FastAPI plus utilisés).
+- Preview : entrée `learnscroll-site` dans `mon-cv\images\.claude\launch.json`
+  (c'est CE launch.json que lisent les preview tools des sessions CV) + copie
+  locale dans `.claude/launch.json` du projet. Port 8077, `python -m http.server`.
 
-## Architecture (3 briques)
+## Architecture v2 (2 briques + 1 actif)
 
 ```
-pipeline/ (batch IA) ──écrit──▶ backend/data/learnscroll.db ◀──lit── backend/ (FastAPI) ◀──HTTP── mobile/ (Flutter) + webapp
+pipeline/ (batch IA + export) ──► data/catalog.sqlite ──► site/ (PWA statique, aucun serveur)
 ```
 
-### 1. `pipeline/` — génération batch (CONSTRUIT, testé hors-ligne, jamais lancé contre l'API réelle)
+### 1. `pipeline/` — génération + export (TESTÉ : `_selftest.py` vert, RSS testé en réel)
 
-- `config.py` : 3 tiers de modèle — `bulk`=claude-sonnet-5 (défaut, tarif intro 2$/10$ jusqu'au 2026-08-31, env `SONNET5_INTRO=0` après), `flagship`=claude-opus-4-8, `hero`=claude-fable-5. Tout passe par la **Message Batches API (−50 %)**.
-- `content_schema.py` : Pydantic `KnowledgeCard` = hook, category (10 catégories sans accents : science, tech, histoire, geopolitique, psychologie, economie, espace, nature, culture, sante), mode (`actualite`|`info`), reading_time (`30s`|`2min`|`5min`), teaser, body, why_layers[] (question/answer), sources[] (title/url), image_prompt, tags. `card_json_schema()` durcit le schéma pour Structured Outputs (additionalProperties=false, required complet ; pas de récursion → arbre « pourquoi » aplati).
-- `prompts.py` : `STYLE_GUIDE` éditorial français (system, placé avec `cache_control` → prompt caching) + `user_prompt(topic)`.
-- `generate_batch.py` : crée le batch (custom_id stable = idempotence), écrit `.last_batch`. `poll_and_store.py` : poll 30 s, stocke en base (skip si external_id existe).
-- `estimate_cost.py` **exécuté** : Sonnet 5 batch = **0,0072 $/carte** (10 000 cartes ≈ 72 $) ; Opus 4.8 = 0,018 $ ; Fable 5 = 0,036 $. Hypothèses : system ~900 tk caché, prompt ~120 tk, sortie ~1400 tk.
-- `topics_seed.json` : 11 sujets dont la série « Les Romains » (3 épisodes).
-- `_selftest.py` **passé au vert** : schéma durci + validation Pydantic + aller-retour DB.
+- `catalog.py` : catalogue SQLite en **stdlib sqlite3** (plus de SQLAlchemy).
+  Tables `cards` (série en colonne texte) + `news_seen` (dédup RSS). Idempotence par `external_id`.
+- `config.py` : 3 tiers — bulk=Sonnet 5 (0,0077 $/carte batch), flagship=Opus 4.8
+  (0,0194 $), hero=Fable 5 (0,0387 $). `SONNET5_INTRO=0` après le 2026-08-31.
+- `content_schema.py` : `KnowledgeCard` sans `image_prompt` (supprimé), 3-4 why_layers.
+- `prompts.py` : STYLE_GUIDE avec règle stricte anti-URL-inventée ; sources =
+  soit la source RSS fournie (citée telle quelle), soit page d'accueil d'institution connue.
+- `fetch_news.py` : **NOUVEAU** — RSS (franceinfo, Le Monde, The Conversation,
+  Sciences et Avenir) → `topics_news.json` avec sources réelles. Stdlib xml.etree.
+- `generate_batch.py` : écrit `.pending_topics.json` (mapping custom_id→sujet) —
+  corrige le bug v1 où les séries n'étaient jamais rattachées depuis un batch.
+- `poll_and_store.py` : stocke au catalogue ; la source RSS du sujet écrase les sources du modèle.
+- `export_site.py` : **NOUVEAU** — catalogue → `site/data/index.json` +
+  `site/data/cards/{id}.json` + cartes liées calculées au build + **vérification
+  des liens** (mort = 404/410 seulement ; 403/429 = anti-bot, on garde) +
+  rapport qualité. Une actu sans source valide n'est pas publiée.
+- Jamais lancé contre l'API réelle (aucun batch payé à ce jour).
 
-### 2. `backend/` — FastAPI (CONSTRUIT, tous les endpoints VÉRIFIÉS en direct)
+### 2. `site/` — PWA statique (VÉRIFIÉE en local via http.server + Browser pane)
 
-- `app/db.py` : SQLAlchemy, SQLite `backend/data/learnscroll.db` (bascule Postgres via `LEARNSCROLL_DATABASE_URL`). Modèles : `Series`, `Card` (props JSON why_layers/sources/tags ; `to_feed()`/`to_detail()`), `WhyDeepCache`, `Interaction` (kind ∈ view|like|favorite|share|expand, dwell_ms).
-- `app/personalization.py` : affinité par catégorie dérivée des interactions (favorite=5, share=4, like=3, expand=2, view=0.3 + bonus dwell) + 25 % d'exploration ; exclut les cartes déjà vues.
-- `app/gamification.py` : streak journalier (calculé en UTC), niveaux Curieux(0)→Passionné(25)→Expert(100)→Sage(300), stats (cartes lues, minutes), séries complétées.
-- `app/why_service.py` : « J'ai compris… mais pourquoi ? » à la demande → génère avec Sonnet 5 UNE fois par (carte, question), cache en DB ; sans clé API renvoie un message dégradé propre.
-- `app/main.py` : `GET /api/feed`, `GET /api/cards/{id}`, `POST /api/cards/{id}/why`, `POST /api/interactions`, `GET /api/favorites`, `GET /api/recommendations/{id}` (même catégorie), `GET /api/profile`, `GET /api/series`, `GET /api/stats` ; monte `/admin` (CMS statique) et `/app` (proto web). CORS `*`.
-- `seed_samples.py` : 5 cartes de démo rédigées main (dont Rome ép.1) — **déjà insérées en base**.
-- Lancement : `cd backend && python -m uvicorn app.main:app --port 8077`.
-- `webapp/index.html` : **prototype web du feed, fonctionnel** — scroll-snap vertical plein écran, DA éditoriale (Fraunces + Inter, fond #0C0B0A, accent ambre #E0A367, teinte + glyphe emoji par catégorie), mode détail glissant, arbre « pourquoi » + champ « Creuser », gamification en topbar, user persisté en localStorage, dwell via IntersectionObserver.
-- `admin_ui/index.html` : back-office lecture (stats/séries/cartes) + export de sujets vers `topics_seed.json`. Pas d'auth.
-- `.claude/launch.json` créé (serveur `learnscroll-api`, port 8077) — mais les preview tools d'une session ouverte dans le dépôt CV ne le voient pas (ils lisent le launch.json du CV).
+- Vanilla HTML/CSS/JS, zéro framework, zéro tracker. DA conservée (Fraunces +
+  Inter, fond #0C0B0A, accent ambre #E0A367, teinte par catégorie — bug v1
+  corrigé : les variables CSS portent les noms exacts des slugs).
+- **Tout côté client (localStorage)** : personnalisation (affinité catégorie +
+  exploration + jitter quotidien déterministe + diversité anti-monotonie),
+  gamification (streak en **fuseau local**, niveaux Curieux→Sage, minutes,
+  progression séries), favoris (toggle réel), cartes vues exclues du feed.
+- Détail : arbre « pourquoi » à **révélation progressive** (1 couche par clic),
+  cartes liées « Continuer à creuser », sources cliquables. Échappement HTML
+  systématique (XSS v1 corrigé). Permaliens `#c/id`. Web Share API.
+- `sw.js` : offline (coquille cache-first, index network-first, cartes au fil de l'eau).
+- `.github/workflows/deploy.yml` : push main → GitHub Pages (dossier `site/`).
 
-### 3. `mobile/` — Flutter (ÉCRIT, JAMAIS COMPILÉ — SDK absent de la machine)
+## Vérifié le 16/07/2026
 
-- `pubspec.yaml` : http, google_fonts ; Dart ≥3.6 (usage de `Color.withValues`, Flutter 3.27+).
-- `lib/` : `config.dart` (10.0.2.2 pour émulateur Android, override `--dart-define=API_BASE=`), `models.dart`, `api.dart`, `theme.dart` (même DA que la webapp), `main.dart` (NavigationBar 3 onglets), `screens/feed_screen.dart` (PageView vertical + dwell tracking + load more), `detail_screen.dart` (arbre pourquoi + creuser), `favorites_screen.dart`, `profile_screen.dart` (streak/niveau/stats/séries).
+Selftest pipeline 100 % vert ; seed 5 cartes + export réel OK ; RSS réel : 8
+sujets/4 flux avec vraies URLs ; dans le navigateur : feed rendu, détail,
+pourquoi progressif, favoris, profil, permalien après reload, persistance,
+exclusion des vues, 0 erreur console. Limites de l'environnement de test :
+screenshots et IntersectionObserver inertes dans le Browser pane (renderer sans
+frames) — le dwell tracking (pattern identique v1) est à re-vérifier sur un
+vrai appareil.
 
-## Défauts connus et assumés (avis franc déjà donné à l'utilisateur)
+## Défauts connus / prochaines étapes
 
-1. **Sources fabriquées** : le prompt demande des « URLs plausibles » → citations hallucinées. À remplacer par ingestion RSS réelle. `fetch_news.py` n'a jamais été écrit (le mode `actualite` n'existe que comme champ).
-2. **Flutter : user id aléatoire non persisté** → streaks/favoris/perso perdus à chaque relance (ajouter shared_preferences). La webapp, elle, persiste (localStorage).
-3. **Unfavorite pas géré serveur** (interactions append-only, le toggle UI est local).
-4. Personnalisation naïve ; placeholder de récence mort (×0.0) dans `personalization.py` ; le feed charge toutes les cartes en mémoire (OK ≤ ~5k cartes).
-5. Streak en UTC, pas en fuseau local.
-6. Pas d'images (champ `image_prompt` prêt, rien de branché) — glyphes emoji sur dégradés.
-7. Pas d'auth ; CORS ouvert ; admin sans auth.
-
-## Verdict donné
-
-Bon projet portfolio (pensée coûts/archi complète). Startup risquée : créneau occupé (Imprint, Perplexity Discover ; Artifact fermé en 2024), « addictif mais éducatif » = tension, sources inventées = disqualifiant pour la confiance. Prochaine étape recommandée : mettre 20 vraies cartes devant 10 personnes, mesurer le retour à J+1.
-
-## Prochaines étapes proposées (non commencées)
-
-1. Ingestion RSS réelle (sources authentiques + mode actualité).
-2. Persistance de l'utilisateur côté Flutter (shared_preferences).
-3. Toggle favoris côté serveur (kind `unfavorite` ou table dédiée).
-4. Génération/sélection d'images éditoriales.
-5. Cron de réapprovisionnement du catalogue.
-6. `git init` + premier commit (jamais fait).
+1. Le « Creuser » libre (question à l'IA) a été supprimé volontairement (coût
+   non borné sans auth). Si besoin un jour : fonction serverless + rate limit.
+2. Pas d'images (glyphes emoji sur dégradés) — un générateur/banque d'images
+   cohérente reste le gros chantier visuel.
+3. Dwell tracking IntersectionObserver à valider sur mobile réel.
+4. Pas de remote GitHub → créer le repo + activer Pages pour déployer.
+5. Lancer un premier vrai batch (topics_seed.json, ~11 sujets ≈ 0,09 $).

@@ -74,12 +74,6 @@ TIERS: dict[str, ModelTier] = {
 # Tier utilisé par défaut si un sujet n'en spécifie pas.
 DEFAULT_TIER = os.getenv("LEARNSCROLL_TIER", "bulk")
 
-# Emplacement de la base partagée pipeline <-> backend.
-DB_PATH = os.getenv(
-    "LEARNSCROLL_DB",
-    os.path.join(os.path.dirname(__file__), "..", "backend", "data", "learnscroll.db"),
-)
-
 
 def get_tier(name: str | None) -> ModelTier:
     return TIERS[name or DEFAULT_TIER]

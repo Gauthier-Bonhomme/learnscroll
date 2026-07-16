@@ -1,5 +1,6 @@
 """
-Interroge un batch jusqu'à complétion, parse les résultats et stocke les cartes.
+Interroge un batch jusqu'à complétion, parse les résultats et stocke les cartes
+dans le catalogue (data/catalog.sqlite).
 
 Usage :
     python poll_and_store.py               # utilise .last_batch
@@ -7,7 +8,8 @@ Usage :
 
 Les résultats arrivent dans un ordre quelconque -> on retrouve chaque carte par
 son custom_id. Le stockage est idempotent (external_id unique) : relancer ne
-duplique rien.
+duplique rien. Les métadonnées de série et la source réelle viennent du mapping
+.pending_topics.json écrit par generate_batch.py — pas de la sortie du modèle.
 """
 
 from __future__ import annotations
@@ -19,11 +21,11 @@ import time
 
 import anthropic
 
-# Rend importable backend/app/db.py depuis le pipeline.
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
-from app.db import Card, Series, SessionLocal, init_db  # noqa: E402
+import catalog
 
-_LAST = os.path.join(os.path.dirname(__file__), ".last_batch")
+_HERE = os.path.dirname(__file__)
+_LAST = os.path.join(_HERE, ".last_batch")
+_PENDING = os.path.join(_HERE, ".pending_topics.json")
 
 
 def _resolve_batch_id() -> tuple[str, str]:
@@ -34,6 +36,13 @@ def _resolve_batch_id() -> tuple[str, str]:
     with open(_LAST, encoding="utf-8") as f:
         lines = f.read().splitlines()
     return lines[0], (lines[1] if len(lines) > 1 else "")
+
+
+def _load_pending() -> dict[str, dict]:
+    if not os.path.exists(_PENDING):
+        return {}
+    with open(_PENDING, encoding="utf-8") as f:
+        return json.load(f)
 
 
 def _wait(client: anthropic.Anthropic, batch_id: str) -> None:
@@ -47,20 +56,9 @@ def _wait(client: anthropic.Anthropic, batch_id: str) -> None:
         time.sleep(30)
 
 
-def _get_or_create_series(session, name: str, category: str) -> Series | None:
-    if not name:
-        return None
-    series = session.query(Series).filter_by(name=name).one_or_none()
-    if series is None:
-        series = Series(name=name, category=category or "")
-        session.add(series)
-        session.flush()
-    return series
-
-
 def _store(client: anthropic.Anthropic, batch_id: str, model_used: str) -> None:
-    init_db()
-    session = SessionLocal()
+    pending = _load_pending()
+    conn = catalog.connect()
     stored = skipped = failed = 0
 
     for result in client.messages.batches.results(batch_id):
@@ -76,33 +74,42 @@ def _store(client: anthropic.Anthropic, batch_id: str, model_used: str) -> None:
             failed += 1
             continue
         data = json.loads(text)
+        topic = pending.get(cid, {})
 
-        if session.query(Card).filter_by(external_id=cid).first():
+        # La source réelle (RSS) prime sur ce que le modèle a cité.
+        sources = data.get("sources", [])
+        if topic.get("source"):
+            src = topic["source"]
+            sources = [{"title": src["title"], "url": src["url"]}]
+
+        ok = catalog.upsert_card(conn, {
+            "external_id": cid,
+            "hook": data["hook"],
+            "category": data["category"],
+            "mode": data["mode"],
+            "reading_time": data["reading_time"],
+            "teaser": data["teaser"],
+            "body": data["body"],
+            "why_layers": data.get("why_layers", []),
+            "sources": sources,
+            "tags": data.get("tags", []),
+            "series": topic.get("series", ""),
+            "series_index": topic.get("series_index"),
+            "series_total": topic.get("series_total"),
+            "model_used": model_used or message.model,
+        })
+        if ok:
+            stored += 1
+            pending.pop(cid, None)
+        else:
             skipped += 1
-            continue
 
-        series = _get_or_create_series(session, data.get("series", ""), data.get("category", ""))
-        card = Card(
-            external_id=cid,
-            hook=data["hook"],
-            category=data["category"],
-            mode=data["mode"],
-            reading_time=data["reading_time"],
-            teaser=data["teaser"],
-            body=data["body"],
-            image_prompt=data.get("image_prompt", ""),
-            model_used=model_used or message.model,
-            series=series,
-        )
-        card.why_layers = data.get("why_layers", [])
-        card.sources = data.get("sources", [])
-        card.tags = data.get("tags", [])
-        session.add(card)
-        stored += 1
-
-    session.commit()
-    session.close()
+    conn.commit()
+    conn.close()
+    with open(_PENDING, "w", encoding="utf-8") as f:
+        json.dump(pending, f, ensure_ascii=False, indent=1)
     print(f"→ Stockées : {stored} | déjà présentes : {skipped} | échecs : {failed}")
+    print("  Puis :  python export_site.py")
 
 
 def main() -> None:

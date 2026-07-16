@@ -5,11 +5,11 @@ Aucune dépendance externe : lance `python estimate_cost.py` (ou avec un volume 
 `python estimate_cost.py 10000`). Modélise Batches API (-50 %) + prompt caching
 sur le guide de style partagé.
 
-Hypothèses par carte (mesurées sur le schéma réel : hook + teaser + body +
-2-3 couches 'pourquoi' + sources + tags) :
-  - guide de style (system, mis en cache)  ~900 tokens
-  - prompt sujet (input non caché)          ~120 tokens
-  - sortie JSON structurée                 ~1400 tokens
+Hypothèses par carte (schéma v2 : hook + teaser + body + 3-4 couches 'pourquoi'
++ sources + tags ; le champ image_prompt a été supprimé) :
+  - guide de style (system, mis en cache)  ~950 tokens
+  - prompt sujet (input non caché)          ~150 tokens (résumé RSS inclus)
+  - sortie JSON structurée                 ~1500 tokens
 """
 
 from __future__ import annotations
@@ -18,9 +18,9 @@ import sys
 
 from config import TIERS
 
-STYLE_GUIDE_TOKENS = 900     # system partagé -> cache après la 1re requête du lot
-PROMPT_TOKENS = 120          # consigne sujet, unique par carte
-OUTPUT_TOKENS = 1400         # carte JSON complète
+STYLE_GUIDE_TOKENS = 950     # system partagé -> cache après la 1re requête du lot
+PROMPT_TOKENS = 150          # consigne sujet (+ résumé d'actu), unique par carte
+OUTPUT_TOKENS = 1500         # carte JSON complète (4e couche 'pourquoi' incluse)
 
 CACHE_WRITE_MULT = 1.25      # écriture cache (5 min)
 CACHE_READ_MULT = 0.10       # lecture cache

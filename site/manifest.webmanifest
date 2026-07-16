@@ -1,0 +1,16 @@
+{
+  "name": "LearnScroll",
+  "short_name": "LearnScroll",
+  "description": "Remplace le doomscrolling par du learnscrolling : chaque swipe t'apprend quelque chose en moins de 60 secondes.",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0c0b0a",
+  "theme_color": "#0c0b0a",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

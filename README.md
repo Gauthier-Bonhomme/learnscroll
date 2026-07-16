@@ -3,85 +3,90 @@
 > Remplacer le doomscrolling par du **learnscrolling** : un feed vertical type
 > TikTok où chaque swipe fait apprendre quelque chose en moins de 60 secondes.
 
-## Principe de coût (le cœur du modèle)
+## Le principe de coût (le cœur du modèle)
 
-L'IA **n'est jamais** appelée à l'ouverture d'une carte. Tout le contenu est
-généré **en amont, en lot**, stocké en base, et le feed ne lit que du contenu
-déjà généré. L'IA sert uniquement à remplir et enrichir la base, périodiquement.
+L'app est **gratuite pour toujours**, donc l'infrastructure doit tendre vers
+**0 €** : le contenu est généré **en amont, en lot** (Batches API, −50 %),
+stocké dans un catalogue, puis **exporté en fichiers statiques**. Le site
+publié n'a **aucun serveur** : pas d'API, pas de base en production, pas
+d'appel IA au runtime — donc pas de facture qui grimpe avec l'audience, et
+aucune surface d'abus (pas d'endpoint LLM ouvert).
 
 ```
-  pipeline/ (batch)                 backend/ (FastAPI)              mobile/ (Flutter)
- ┌──────────────────┐   écrit     ┌────────────────────┐   HTTP   ┌──────────────────┐
- │ Message Batches  │────────────▶│  learnscroll.db     │◀────────│  Feed vertical    │
- │ Sonnet 5 (-50%)  │             │  /api/feed …        │         │  Détail + pourquoi│
- │ + prompt caching │             │  + admin + webapp   │         │  Favoris + profil │
- └──────────────────┘             └────────────────────┘         └──────────────────┘
-        aucun appel IA au runtime ───────────────┘
+ pipeline/ (batch, ~0,008 $/carte)      data/catalog.sqlite       site/ (PWA statique)
+┌───────────────────────────────┐      ┌────────────────┐      ┌─────────────────────────┐
+│ fetch_news.py   (RSS réels)   │─────▶│  le catalogue   │─────▶│ data/index.json          │
+│ generate_batch  (Sonnet 5)    │      │  s'accumule     │export│ data/cards/{id}.json     │
+│ poll_and_store  (idempotent)  │      └────────────────┘      │ GitHub Pages / Cloudflare │
+└───────────────────────────────┘                               └─────────────────────────┘
+                                                                personnalisation, streaks,
+                                                                favoris : 100 % sur l'appareil
 ```
 
-## Les trois briques
+La personnalisation, la gamification (streak en fuseau local, niveaux
+Curieux→Sage), les favoris et l'historique vivent **dans le navigateur**
+(localStorage) : vie privée par design, aucune donnée ne quitte l'appareil,
+et l'app fonctionne hors-ligne (service worker).
 
-| Dossier | Rôle | Techno | État |
-|---------|------|--------|------|
-| `pipeline/` | Génération batch du contenu | Python + Anthropic SDK (Message Batches) | ✅ construit, testé hors-ligne |
-| `backend/` | API du feed + admin CMS + app web de démo | FastAPI + SQLAlchemy (SQLite→PostgreSQL) | ✅ construit, endpoints vérifiés en direct |
-| `mobile/` | App mobile de production | Flutter | ✅ écrit (nécessite le SDK Flutter pour compiler) |
-
-## Démarrage
-
-### 1. Backend + contenu de démo (aucune clé API requise)
+## Démarrage (aucune clé API requise)
 
 ```bash
-cd backend
-pip install -r requirements.txt
-python seed_samples.py                       # insère 5 cartes de démo
-python -m uvicorn app.main:app --port 8077
+cd pipeline
+python seed_samples.py        # 5 cartes de démo dans le catalogue
+python export_site.py         # exporte les JSON statiques dans site/data/
+python -m http.server 8077 --directory ../site
+# → http://localhost:8077
 ```
 
-- Feed API : http://localhost:8077/api/feed
-- App web (prototype du feed) : http://localhost:8077/app
-- Admin CMS : http://localhost:8077/admin
-- Docs OpenAPI : http://localhost:8077/docs
-
-### 2. Générer du vrai contenu (batch)
+## Générer du vrai contenu (batch)
 
 ```bash
 cd pipeline
 pip install -r requirements.txt
-export ANTHROPIC_API_KEY=...                  # ou: ant auth login
-python estimate_cost.py 10000                 # chiffrer avant de lancer
-python generate_batch.py topics_seed.json     # crée le job Batches (Sonnet 5)
-python poll_and_store.py                       # attend la fin puis stocke en base
+export ANTHROPIC_API_KEY=...
+
+python estimate_cost.py 10000            # chiffrer avant de lancer
+python fetch_news.py                     # actus RSS -> sujets avec sources RÉELLES
+python generate_batch.py topics_news.json     # ou topics_seed.json (evergreen)
+python poll_and_store.py                 # attend la fin du lot, stocke au catalogue
+python export_site.py                    # vérifie les liens + publie dans site/data/
 ```
 
-Coût : **~0,0072 $/carte** en Sonnet 5 batch (voir `pipeline/README.md` pour le
-détail du choix de modèle et le tableau de coûts).
+Coût : **~0,008 $/carte** en Sonnet 5 batch (voir `pipeline/README.md`).
+Réapprovisionner le feed = relancer ces quatre commandes (cron-able).
 
-### 3. App mobile Flutter
+## Intégrité des sources
 
-```bash
-cd mobile
-flutter pub get
-flutter run                                    # émulateur -> API sur 10.0.2.2:8077
-# ou pointer un vrai serveur :
-flutter run --dart-define=API_BASE=http://192.168.x.x:8077
-```
+- Mode **actualité** : chaque sujet vient d'un flux RSS (franceinfo, Le Monde,
+  The Conversation, Sciences et Avenir) et la carte cite **l'URL réelle de
+  l'article source** — jamais une URL générée par le modèle.
+- Mode **info** (evergreen) : le modèle ne peut citer que des pages d'accueil
+  d'institutions connues, et `export_site.py` **vérifie chaque lien** au
+  build ; les liens morts sont écartés, une actu sans source n'est pas publiée.
 
-## Ce qui est couvert (cahier des charges)
+## Déploiement
 
-- **Feed vertical + cartes** (accroche, temps de lecture, ❤️/📤/👇) — feed & mobile
-- **Mode détail narratif** + **arbre récursif « J'ai compris… mais pourquoi ? »**
-- **Modes Actualité / Info** (champ `mode` sur chaque carte)
-- **Personnalisation** automatique par affinité de catégorie (signaux : vues,
-  temps passé, likes, favoris) + part d'exploration
-- **Gamification** : streak journalier, niveaux (Curieux→Sage), stats, séries
-- **Social** : favoris, partage, « Tu aimeras aussi », historique via interactions
-- **CMS interne** pour préparer les sujets à générer
-- **Pipeline IA batch** avec stockage — coûts minimisés
+Pousser sur `main` : le workflow `.github/workflows/deploy.yml` publie `site/`
+sur GitHub Pages (gratuit, CDN). N'importe quel hébergeur statique fait
+l'affaire (Cloudflare Pages, Netlify…).
 
-## Reste à faire
+## Fonctionnalités
 
-- Génération/sélection d'images éditoriales (le champ `image_prompt` est prêt ;
-  brancher un générateur ou une banque d'images cohérente).
-- Auth utilisateur (aujourd'hui : id local anonyme).
-- Ordonnancement du réapprovisionnement (cron : nouvelles actus / séries).
+- **Feed vertical** personnalisé par affinité de catégorie (vues, temps passé,
+  favoris, partages) + part d'exploration + variation quotidienne déterministe
+- **Mode détail narratif** + arbre **« J'ai compris… mais pourquoi ? »** à
+  révélation progressive (3-4 couches pré-générées)
+- **Cartes liées** (« Continuer à creuser ») calculées au build : épisode
+  suivant d'une série d'abord, puis proximité de catégorie et de tags
+- **Gamification** : streak journalier (fuseau local), niveaux, minutes
+  apprises, progression des séries
+- **Favoris** (toggle réel), **partage** (Web Share API + permalien `#c/id`)
+- **PWA** : installable, offline, ~0 dépendance (zéro framework, zéro tracker)
+
+## Structure
+
+| Dossier | Rôle |
+|---------|------|
+| `pipeline/` | Génération batch (Anthropic SDK), ingestion RSS, export statique |
+| `data/` | `catalog.sqlite` — le catalogue accumulé (l'actif du projet) |
+| `site/` | La PWA publiée : HTML/CSS/JS vanilla + `data/` exporté |

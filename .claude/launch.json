@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "learnscroll-api",
+      "name": "learnscroll-site",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--port", "8077"],
+      "runtimeArgs": ["-m", "http.server", "8077", "--directory", "site"],
       "port": 8077
     }
   ]
